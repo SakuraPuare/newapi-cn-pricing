@@ -285,7 +285,11 @@ MODELS: dict[str, ModelPricing] = {
     'MiniMax-M2.7':                                 ModelPricing(2.1, 8.4, 0.42),
     'MiniMax-M2.7-highspeed':                       ModelPricing(4.2, 16.8, 0.42),
     'MiniMax-M3':                                   ModelPricing(2.0, 8.0, tiers=[Tier(512000, 2.1, 8.4, 0.42), Tier(None, 4.2, 16.8, 0.84)]),
-    'Minimax-M3':                                   ModelPricing(2.1, 8.4, 0.42, tiers=[Tier(512000, 2.1, 8.4, 0.42), Tier(None, 4.2, 16.8, 0.84)]),
+    # ⚠️ 线上模型名是 'Minimax-M3'(小写 n),与其余 MiniMax-* 拼写不一致。
+    # Go map 查找大小写敏感,只写一个拼写会让另一个静默落到 37.5 兜底价 → 两个都定价。
+    # 价格填**原价**(官网标"永久五折",与其他限时折扣同样按原价口径,见 README)。
+    'Minimax-M3':                                   ModelPricing(4.2, 16.8, 0.84, tiers=[Tier(512000, 4.2, 16.8, 0.84), Tier(None, 8.4, 33.6, 0.84)]),
+    'MiniMax-M3':                                   ModelPricing(4.2, 16.8, 0.84, tiers=[Tier(512000, 4.2, 16.8, 0.84), Tier(None, 8.4, 33.6, 0.84)]),
 
     # ━━━ Baichuan ━━━
     'baichuan3-turbo':                              ModelPricing(1.0, 1.0),
