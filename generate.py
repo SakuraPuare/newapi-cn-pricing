@@ -2,8 +2,9 @@
 """
 Generate new-api compatible pricing JSON for Chinese domestic model APIs.
 
-All prices are based on DOMESTIC (China mainland) pricing in CNY,
-then converted to USD using the configured exchange rate.
+All prices are based on DOMESTIC (China mainland) pricing in CNY.
+本站计价单位 1 "$" = 1 CNY,故直接使用人民币原价,不做汇率换算;
+利润由 new-api 的分组倍率承担(default 组 1.1 = 原价 +10%)。
 
 Output format: new-api "type1" ratio_config (same as basellm/llm-metadata).
 
@@ -17,8 +18,11 @@ import sys
 from dataclasses import dataclass, field
 
 # ─── Configuration ───────────────────────────────────────────────────────────
-EXCHANGE_RATE = 7.3  # CNY per USD
-RATIO_BASE = 2.0     # new-api: model_ratio=1.0 corresponds to $2/1M tokens
+# 站内货币口径:本站 1 "$" = 1 CNY(用户充值 10 元 → 账户记 10 $)。
+# 所以模型价直接使用厂商官网的人民币原价,不做汇率换算。
+# 若将来改成真美元计价,把此值改为汇率(如 7.3)即可,两处公式都会跟随。
+CNY_PER_SITE_UNIT = 1.0
+RATIO_BASE = 2.0     # new-api: model_ratio=1.0 corresponds to 2 站内单位/1M tokens
 
 # ─── Data structures ─────────────────────────────────────────────────────────
 @dataclass
@@ -31,8 +35,8 @@ class ModelPricing:
 
 def cny_to_ratio(cny_per_1m: float) -> float:
     """Convert CNY/1M tokens to new-api model_ratio."""
-    usd_per_1m = cny_per_1m / EXCHANGE_RATE
-    return usd_per_1m / RATIO_BASE
+    site_unit_per_1m = cny_per_1m / CNY_PER_SITE_UNIT
+    return site_unit_per_1m / RATIO_BASE
 
 
 def completion_ratio(input_cny: float, output_cny: float) -> float:
@@ -133,36 +137,36 @@ MODELS: dict[str, ModelPricing] = {
         'len <= 32000 ? tier("0_32k", p * %.4f + c * %.4f) '
         ': len <= 128000 ? tier("32k_128k", p * %.4f + c * %.4f) '
         ': tier("128k_plus", p * %.4f + c * %.4f)' % (
-            2.0/EXCHANGE_RATE, 10.0/EXCHANGE_RATE,
-            4.0/EXCHANGE_RATE, 20.0/EXCHANGE_RATE,
-            8.0/EXCHANGE_RATE, 40.0/EXCHANGE_RATE,
+            2.0/CNY_PER_SITE_UNIT, 10.0/CNY_PER_SITE_UNIT,
+            4.0/CNY_PER_SITE_UNIT, 20.0/CNY_PER_SITE_UNIT,
+            8.0/CNY_PER_SITE_UNIT, 40.0/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3-coder-flash": ModelPricing(1.0, 4.0, billing_expr=(
         'len <= 32000 ? tier("0_32k", p * %.4f + c * %.4f) '
         ': len <= 128000 ? tier("32k_128k", p * %.4f + c * %.4f) '
         ': tier("128k_plus", p * %.4f + c * %.4f)' % (
-            0.5/EXCHANGE_RATE, 2.0/EXCHANGE_RATE,
-            1.0/EXCHANGE_RATE, 4.0/EXCHANGE_RATE,
-            2.0/EXCHANGE_RATE, 8.0/EXCHANGE_RATE,
+            0.5/CNY_PER_SITE_UNIT, 2.0/CNY_PER_SITE_UNIT,
+            1.0/CNY_PER_SITE_UNIT, 4.0/CNY_PER_SITE_UNIT,
+            2.0/CNY_PER_SITE_UNIT, 8.0/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3-coder-30b-a3b-instruct": ModelPricing(0.5, 2.5, billing_expr=(
         'len <= 32000 ? tier("0_32k", p * %.4f + c * %.4f) '
         ': len <= 128000 ? tier("32k_128k", p * %.4f + c * %.4f) '
         ': tier("128k_plus", p * %.4f + c * %.4f)' % (
-            0.3/EXCHANGE_RATE, 1.5/EXCHANGE_RATE,
-            0.5/EXCHANGE_RATE, 2.5/EXCHANGE_RATE,
-            0.8/EXCHANGE_RATE, 4.0/EXCHANGE_RATE,
+            0.3/CNY_PER_SITE_UNIT, 1.5/CNY_PER_SITE_UNIT,
+            0.5/CNY_PER_SITE_UNIT, 2.5/CNY_PER_SITE_UNIT,
+            0.8/CNY_PER_SITE_UNIT, 4.0/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3-coder-480b-a35b-instruct": ModelPricing(1.5, 7.5, billing_expr=(
         'len <= 32000 ? tier("0_32k", p * %.4f + c * %.4f) '
         ': len <= 128000 ? tier("32k_128k", p * %.4f + c * %.4f) '
         ': tier("128k_plus", p * %.4f + c * %.4f)' % (
-            1.5/EXCHANGE_RATE, 7.5/EXCHANGE_RATE,
-            2.7/EXCHANGE_RATE, 13.5/EXCHANGE_RATE,
-            4.5/EXCHANGE_RATE, 22.5/EXCHANGE_RATE,
+            1.5/CNY_PER_SITE_UNIT, 7.5/CNY_PER_SITE_UNIT,
+            2.7/CNY_PER_SITE_UNIT, 13.5/CNY_PER_SITE_UNIT,
+            4.5/CNY_PER_SITE_UNIT, 22.5/CNY_PER_SITE_UNIT,
         )
     )),
     # Qwen3.5 series (Beijing)
@@ -180,24 +184,24 @@ MODELS: dict[str, ModelPricing] = {
     "qwen3.6-plus": ModelPricing(1.0, 6.0, billing_expr=(
         'len <= 256000 ? tier("0_256k", p * %.4f + c * %.4f + cr * %.4f) '
         ': tier("256k_plus", p * %.4f + c * %.4f + cr * %.4f)' % (
-            1.0/EXCHANGE_RATE, 6.0/EXCHANGE_RATE, 0.2/EXCHANGE_RATE,
-            4.0/EXCHANGE_RATE, 12.0/EXCHANGE_RATE, 0.8/EXCHANGE_RATE,
+            1.0/CNY_PER_SITE_UNIT, 6.0/CNY_PER_SITE_UNIT, 0.2/CNY_PER_SITE_UNIT,
+            4.0/CNY_PER_SITE_UNIT, 12.0/CNY_PER_SITE_UNIT, 0.8/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3.7-flash": ModelPricing(0.06, 0.24, billing_expr=(
         'len <= 32000 ? tier("0_32k", p * %.5f + c * %.5f + cr * %.6f) '
         ': len <= 256000 ? tier("32k_256k", p * %.5f + c * %.5f + cr * %.6f) '
         ': tier("256k_plus", p * %.5f + c * %.5f + cr * %.6f)' % (
-            0.06/EXCHANGE_RATE, 0.24/EXCHANGE_RATE, 0.006/EXCHANGE_RATE,
-            0.18/EXCHANGE_RATE, 0.72/EXCHANGE_RATE, 0.018/EXCHANGE_RATE,
-            0.36/EXCHANGE_RATE, 1.44/EXCHANGE_RATE, 0.036/EXCHANGE_RATE,
+            0.06/CNY_PER_SITE_UNIT, 0.24/CNY_PER_SITE_UNIT, 0.006/CNY_PER_SITE_UNIT,
+            0.18/CNY_PER_SITE_UNIT, 0.72/CNY_PER_SITE_UNIT, 0.018/CNY_PER_SITE_UNIT,
+            0.36/CNY_PER_SITE_UNIT, 1.44/CNY_PER_SITE_UNIT, 0.036/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3.7-plus": ModelPricing(1.0, 6.0, billing_expr=(
         'len <= 256000 ? tier("0_256k", p * %.4f + c * %.4f + cr * %.4f) '
         ': tier("256k_plus", p * %.4f + c * %.4f + cr * %.4f)' % (
-            1.0/EXCHANGE_RATE, 6.0/EXCHANGE_RATE, 0.2/EXCHANGE_RATE,
-            4.0/EXCHANGE_RATE, 12.0/EXCHANGE_RATE, 0.8/EXCHANGE_RATE,
+            1.0/CNY_PER_SITE_UNIT, 6.0/CNY_PER_SITE_UNIT, 0.2/CNY_PER_SITE_UNIT,
+            4.0/CNY_PER_SITE_UNIT, 12.0/CNY_PER_SITE_UNIT, 0.8/CNY_PER_SITE_UNIT,
         )
     )),
     "qwen3.7-max":                  ModelPricing(2.4,  9.6,  0.48),
@@ -276,8 +280,8 @@ MODELS: dict[str, ModelPricing] = {
     "MiniMax-M3": ModelPricing(2.0, 8.0, billing_expr=(
         'len <= 512000 ? tier("0_512k", p * %.4f + c * %.4f + cr * %.4f) '
         ': tier("512k_plus", p * %.4f + c * %.4f + cr * %.4f)' % (
-            2.0/EXCHANGE_RATE, 8.0/EXCHANGE_RATE, 0.4/EXCHANGE_RATE,
-            4.0/EXCHANGE_RATE, 16.0/EXCHANGE_RATE, 0.8/EXCHANGE_RATE,
+            2.0/CNY_PER_SITE_UNIT, 8.0/CNY_PER_SITE_UNIT, 0.4/CNY_PER_SITE_UNIT,
+            4.0/CNY_PER_SITE_UNIT, 16.0/CNY_PER_SITE_UNIT, 0.8/CNY_PER_SITE_UNIT,
         )
     )),
 

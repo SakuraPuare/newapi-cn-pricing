@@ -35,16 +35,32 @@ basellm/llm-metadata 官方预设源使用的是各模型的**国际站 USD 价�
 
 ## 定价公式
 
+⚠️ **本站计价单位 1 "$" = 1 CNY**(用户充值 10 元 → 账户记 10 $),
+所以**直接用人民币原价,不做汇率换算**。利润由 new-api 的**分组倍率**承担。
+
 ```
-model_ratio = 国内CNY价(元/百万token) ÷ 7.3 ÷ 2
-completion_ratio = 输出价 ÷ 输入价
-cache_ratio = 缓存命中价 ÷ 输入价
+model_ratio      = 国内CNY价(元/百万token) ÷ 2      # RATIO_BASE=2
+completion_ratio = 输出价 ÷ 输入价                  # 无量纲
+cache_ratio      = 缓存命中价 ÷ 输入价              # 无量纲
+billing_expr 系数 = 国内CNY价(元/百万token)         # 阶梯计费,单位是「站内$/1M」
 ```
 
-配合分组倍率 `7.3` 使用时:
+new-api 侧的换算链(`pkg/billingexpr/settle.go`、`expr.md:244`):
+
 ```
-用户显示消耗 = model_ratio × 2 × 7.3 = 国内CNY原价 ✓
+显示价 = model_ratio × 2 × group_ratio
+quota  = tokens × model_ratio × group_ratio          (输出再乘 completion_ratio)
+阶梯   = exprOutput ÷ 1e6 × QuotaPerUnit × group_ratio
 ```
+
+线上 `GroupRatio` 实测:`default=1.1`(原价 +10% 利润)、`official=7`、
+`claude=0.2`、`codex=0.14`、`cc0=0.1`、`ccf=0.8`、`cckiro=0.06`、`ccmax=0.8`。
+
+于是 default 组:`用户显示消耗 = CNY原价 × 1.1` ✓
+
+⚠️ **别再除 7.3**。除了就变成只收原价的 15%(亏 6.6 倍)——
+`CNY_PER_SITE_UNIT = 1.0` 这个常量就是唯一的口径开关,
+若将来改成真美元计价,把它改成汇率即可,简单倍率与阶梯表达式两处都会跟随。
 
 ## 更新
 
