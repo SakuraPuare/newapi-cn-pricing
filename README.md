@@ -22,9 +22,27 @@ basellm/llm-metadata 官方预设源使用的是各模型的**国际站 USD 价�
 
 ## 使用方式
 
+### 生成链(顺序固定)
+
+```bash
+python3 generate.py > pricing.json   # 1. 官网价 → ratio
+python3 expand_aliases.py            # 2. 聚合平台别名(siliconflow/*、Pro/*)继承官方价
+python3 snapshot_aliases.py          # 3. 日期快照(qwen-plus-2025-09-11)继承主版本价
+```
+
+第 3 步依赖 `models_live.txt`(线上模型名快照)。刷新它:
+
+```bash
+python3 snapshot_aliases.py --url https://<你的站>/api/pricing
+```
+
+⚠️ **第 3 步不是锦上添花,是防漏网**:new-api 查不到倍率会**静默**回落到内置兜底
+`37.5`(≈ ¥75/1M),厂商每发一个日期快照就会多一个天价模型且无人察觉。
+映射只在「剥掉日期后缀得到的 base 名已有价」时生成,误剥的名字自然被丢弃。
+
 ### 方式一:作为自定义上游预设 URL
 
-1. 生成 JSON:`python3 generate.py > pricing.json`
+1. 按上面的链生成 `pricing.json`
 2. 将 `pricing.json` 部署到任意可访问的 HTTP 地址(GitHub Pages / Nginx / 对象存储)
 3. new-api 后台 → 设置 → 模型定价 → 上游价格同步 → 添加自定义上游 → 填入 URL
 
